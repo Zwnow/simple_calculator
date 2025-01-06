@@ -1,10 +1,7 @@
 pub mod calculator {
-    pub fn parse_expression<I>(args: I) -> String 
-    where
-        I: IntoIterator<Item = String>,
+    pub fn parse_expression(args: impl Iterator<Item = String>) -> String 
     {
-        args.into_iter()
-            .fold(String::new(), |mut expr, part| {
+        args.fold(String::new(), |mut expr, part| {
                 expr.push_str(part.trim());
                 expr
             })
