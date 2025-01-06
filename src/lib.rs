@@ -4,9 +4,8 @@ pub mod calculator {
         I: IntoIterator<Item = String>,
     {
         args.into_iter()
-            .map(|argument| argument.trim().to_string())
             .fold(String::new(), |mut expr, part| {
-                expr.push_str(&part);
+                expr.push_str(part.trim());
                 expr
             })
     }
