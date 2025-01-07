@@ -1,10 +1,7 @@
 pub mod calculator {
     pub fn parse_expression(args: impl Iterator<Item = String>) -> String 
     {
-        args.fold(String::new(), |mut expr, part| {
-                expr.push_str(part.trim());
-                expr
-            })
+        args.collect::<Vec<String>>().join("")
     }
 }
 
