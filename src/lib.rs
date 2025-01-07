@@ -8,6 +8,7 @@ pub mod calculator {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
