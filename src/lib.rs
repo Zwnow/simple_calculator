@@ -20,14 +20,25 @@ pub mod calculator {
                     i = end;
                     tokens.push(Token::new(TokenType::Number, num));
                 },
-                b'+' | b'*' | b'/' | b'-' => {
+                b'+' | b'*' | b'/' => {
                     tokens.push(Token::new(TokenType::Operator, parse_operator(i, &bytes)));
                     i += 1;
                 },
                 b'(' | b')' => {
                     tokens.push(Token::new(TokenType::Parenthesis, parse_operator(i, &bytes)));
                     i += 1;
-                }
+                },
+                b'-' => {
+                    let is_number = bytes[i + 1] >= 48 && bytes[i + 1] <= 57;
+                    if is_number {
+                        let (num, end) = parse_number(i, &bytes);
+                        i = end;
+                        tokens.push(Token::new(TokenType::Number, num));
+                    } else {
+                        tokens.push(Token::new(TokenType::Operator, parse_operator(i, &bytes)));
+                        i += 1;
+                    }
+                },
                 // Illegal
                 _ => panic!("Invalid character in expression"),
             }
