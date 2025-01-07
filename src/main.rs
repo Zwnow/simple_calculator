@@ -9,5 +9,9 @@ fn main() {
     };
     
     let expression = calculator::parse_expression(args);
-    println!("{}", expression);
+    let tokens = calculator::tokenize(&expression);
+    let rpn = calculator::shunting_yard(tokens);
+    let result = calculator::evaluate(rpn);
+
+    println!("Output: {}", result);
 }
