@@ -2,113 +2,91 @@ pub mod calculator {
     use std::str;
     use std::collections::HashMap;
 
+    /// Parse an expression.
+    ///
+    /// Takes the command line arguments and joins them to a single expression.
     pub fn parse_expression(args: impl Iterator<Item = String>) -> String 
     {
-        args.collect::<Vec<String>>().join("")
+        args.collect::<Vec<String>>().join("").replace(" ", "")
     }
 
-    pub fn tokenize(expression: &str) -> Vec<Token> {
-        let mut tokens: Vec<Token> = Vec::new();
-        let bytes = expression.as_bytes();
-
-        let mut i = 0;
-        while i < bytes.len() {
-            match bytes[i] {
-                // 0..9
-                48..=57 => {
-                    let (num, end) = parse_number(i, &bytes);
-                    i = end;
-                    tokens.push(Token::new(TokenType::Number, num));
-                },
-                b'+' | b'*' | b'/' => {
-                    tokens.push(Token::new(TokenType::Operator, parse_operator(i, &bytes)));
-                    i += 1;
-                },
-                b'(' | b')' => {
-                    tokens.push(Token::new(TokenType::Parenthesis, parse_operator(i, &bytes)));
-                    i += 1;
-                },
-                b'-' => {
-                    let is_number = bytes[i + 1] >= 48 && bytes[i + 1] <= 57;
-                    if is_number {
-                        let (num, end) = parse_number(i, &bytes);
-                        i = end;
-                        tokens.push(Token::new(TokenType::Number, num));
-                    } else {
-                        tokens.push(Token::new(TokenType::Operator, parse_operator(i, &bytes)));
-                        i += 1;
-                    }
-                },
-                // Illegal
-                _ => panic!("Invalid character in expression"),
-            }
-        }
-
-        tokens
-    }
-
-    pub fn shunting_yard(tokens: Vec<Token>) -> Vec<String> {
+    /// The shunting yard algorithm transforms an expression to the reverse polish notation.
+    pub fn shunting_yard(expression: String) -> Vec<String> {
         let mut output: Vec<String> = vec![];
         let mut operators: Vec<String> = vec![];
 
         // Define operator precedence and associativity
-        let precedence: HashMap<&str, (u8, bool)> = HashMap::from([
-            ("+", (1, true)), // (precedence, left-associative)
-            ("-", (1, true)),
-            ("*", (2, true)),
-            ("/", (2, true)),
+        let precedence: HashMap<u8, u8> = HashMap::from([
+            (b'+', 1), 
+            (b'-', 1),
+            (b'*', 2),
+            (b'/', 2),
         ]);
 
-        for token in tokens {
-            match token.token_type {
-                TokenType::Number => {
-                    output.push(token.value);
-                }
-                TokenType::Operator => {
-                    // Pop operators with higher or equal precedence
-                    while let Some(top_op) = operators.last() {
-                        if let Some(&(top_prec, top_left_assoc)) = precedence.get(top_op.as_str()) {
-                            let &(curr_prec, _) = precedence
-                                .get(token.value.as_str())
-                                .expect("Unknown operator");
+        let mut position = 0;
+        let bytes = expression.as_bytes();
 
-                            if top_prec > curr_prec || (top_prec == curr_prec && top_left_assoc) {
-                                output.push(operators.pop().unwrap());
+        while position < expression.len() {
+            let start = position;
+            match bytes[position] {
+                // Add number to the output
+                b'0'..=b'9' => {
+                    while position < expression.len() && u8::is_ascii_digit(&bytes[position]) {
+                        position += 1;
+                    }
+
+                    output.push(expression[start..position].to_string());
+                },
+                b'-' | b'+' | b'*' | b'/' => {
+                    if operators.is_empty() {
+                        operators.push(expression[position..position + 1].to_string());
+                    } else {
+                        let mut precedence_flag = true;
+                        while precedence_flag {
+                            let top = operators.pop().unwrap();
+                            let precedence_a = precedence.get(&bytes[position]);
+                            let precedence_b = precedence.get(&top.as_bytes()[0]);
+
+                            if precedence_b >= precedence_a {
+                                output.push(top);
                             } else {
-                                break;
+                                precedence_flag = false;
+                                operators.push(top);
+                                operators.push(expression[position..position + 1].to_string());
                             }
-                        } else {
-                            break;
                         }
                     }
-                    // Push the current operator to the stack
-                    operators.push(token.value);
-                }
-                TokenType::Parenthesis => {
-                    if token.value == "(" {
-                        operators.push(token.value);
-                    } else if token.value == ")" {
-                        // Pop to output until a left parenthesis is found
-                        while let Some(top_op) = operators.pop() {
-                            if top_op == "(" {
+                    position += 1;
+                },
+                b'(' | b')' => {
+                    if bytes[position] == b'(' {
+                        operators.push(expression[position..position + 1].to_string());
+                    } else {
+                        while operators.len() > 0 {
+                            let top = operators.pop().unwrap();
+                            if top == "(".to_string() {
                                 break;
+                            } else {
+                                output.push(top);
                             }
-                            output.push(top_op);
                         }
                     }
-                }
+                    position += 1;
+                },
+                _ => panic!("Illegal character found in expression.")
             }
         }
 
-        // Pop any remaining operators to the output
-        while let Some(op) = operators.pop() {
-            output.push(op);
+        while !operators.is_empty() {
+            output.push(operators.pop().unwrap());
         }
-
+            
         output
     }
 
+    /// Evaluates an expression in the form of the reverse polish notation.
     pub fn evaluate(expr: Vec<String>) -> f64 {
+        println!("{:?}", expr);
         let mut stack: Vec<f64> = vec![];
 
         for item in expr {
@@ -121,12 +99,18 @@ pub mod calculator {
                 },
                 "-" => {
                     let a: f64 = stack.pop().expect("Failed to pop from stack");
-                    let b: f64 = stack.pop().expect("Failed to pop from stack");
-                    stack.push(b - a);                },
+                    if stack.len() != 0 {
+                        let b: f64 = stack.pop().expect("Failed to pop from stack");
+                        stack.push(b - a);                
+                    } else {
+                        stack.push(a);
+                    }
+                },
                 "*" => {
                     let a: f64 = stack.pop().expect("Failed to pop from stack");
                     let b: f64 = stack.pop().expect("Failed to pop from stack");
-                    stack.push(b * a);                },
+                    stack.push(b * a);                
+                },
                 "/" => {
                     let a: f64 = stack.pop().expect("Failed to pop from stack");
                     let b: f64 = stack.pop().expect("Failed to pop from stack");
@@ -139,88 +123,6 @@ pub mod calculator {
             println!("{:?}", stack);
         }
 
-        let mut r = 0.0;
-        for num in stack {
-            r += num;
-        }
-
-        r
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub struct Token {
-        pub token_type: TokenType,
-        pub value: String,
-    }
-
-    impl Token {
-        fn new(token_type: TokenType, value: String) -> Token {
-            Token { token_type, value }
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub enum TokenType {
-        Number,
-        Operator,
-        Parenthesis
-    }
-
-    fn parse_number(pos: usize, bytes: &[u8]) -> (String, usize) {
-        let mut end = pos + 1;
-
-        while end < bytes.len() && bytes[end].is_ascii_digit() {
-            end += 1;
-        }
-
-        let num = match str::from_utf8(&bytes[pos..end]) {
-            Ok(v) => v,
-            Err(_) => panic!("Invalid character in byte sequence!"),
-        };
-
-        (num.to_string(), end)
-    }
-
-    fn parse_operator(pos: usize, bytes: &[u8]) -> String {
-        match str::from_utf8(&bytes[pos..pos + 1]) {
-            Ok(v) => v.to_string(),
-            Err(_) => panic!("Tried to parse invalid operator!"),
-        }
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use calculator;
-    use calculator::Token;
-    use calculator::TokenType;
-
-    #[test]
-    fn test_parse_expression() {
-        let expected = "1+1";
-        let args = vec![
-            String::from("1"),
-            String::from("+1")]
-            .into_iter();
-
-        let result = calculator::parse_expression(args);
-
-        assert_eq!(expected, result);
-    }
-
-    #[test]
-    fn test_tokenize() {
-        let expression = "1+1";
-        let expected: Vec<Token> = vec![
-            Token { token_type: TokenType::Number, value: "1".to_string() },
-            Token { token_type: TokenType::Operator, value: "1".to_string() },
-            Token { token_type: TokenType::Number, value: "1".to_string() },
-        ];
-
-        let got = calculator::tokenize(expression);
-
-        assert_eq!(expected, got);
+        stack.pop().unwrap()
     }
 }
