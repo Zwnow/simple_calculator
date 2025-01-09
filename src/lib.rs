@@ -2,14 +2,6 @@ pub mod calculator {
     use std::str;
     use std::collections::HashMap;
 
-    /// Parse an expression.
-    ///
-    /// Takes the command line arguments and joins them to a single expression.
-    pub fn parse_expression(args: impl Iterator<Item = String>) -> String 
-    {
-        args.collect::<Vec<String>>().join("").replace(" ", "")
-    }
-
     /// The shunting yard algorithm transforms an expression to the reverse polish notation.
     pub fn shunting_yard(expression: String) -> Vec<String> {
         let mut output: Vec<String> = vec![];
@@ -24,9 +16,11 @@ pub mod calculator {
         ]);
 
         let mut position = 0;
+        let mut prev_was_operator = true;
         let bytes = expression.as_bytes();
 
         while position < expression.len() {
+            println!("{:?} {:?}", output, operators);
             let start = position;
             match bytes[position] {
                 // Add number to the output
@@ -36,8 +30,9 @@ pub mod calculator {
                     }
 
                     output.push(expression[start..position].to_string());
+                    prev_was_operator = false;
                 },
-                b'-' | b'+' | b'*' | b'/' => {
+                b'+' | b'*' | b'/' => {
                     if operators.is_empty() {
                         operators.push(expression[position..position + 1].to_string());
                     } else {
@@ -56,11 +51,44 @@ pub mod calculator {
                             }
                         }
                     }
+                    prev_was_operator = true;
                     position += 1;
+                },
+                b'-' => {
+                    if prev_was_operator && bytes[position + 1] >= b'0' && bytes[position + 1] <= b'9' {
+                        position += 1;
+                        while position < expression.len() && u8::is_ascii_digit(&bytes[position]) {
+                            position += 1;
+                        }
+                        output.push(expression[start..position].to_string());
+                        prev_was_operator = false;
+                    } else {
+                        if operators.is_empty() {
+                            operators.push(expression[position..position + 1].to_string());
+                        } else {
+                            let mut precedence_flag = true;
+                            while precedence_flag {
+                                let top = operators.pop().unwrap();
+                                let precedence_a = precedence.get(&bytes[position]);
+                                let precedence_b = precedence.get(&top.as_bytes()[0]);
+
+                                if precedence_b >= precedence_a {
+                                    output.push(top);
+                                } else {
+                                    precedence_flag = false;
+                                    operators.push(top);
+                                    operators.push(expression[position..position + 1].to_string());
+                                }
+                            }
+                        }
+                        prev_was_operator = true;
+                        position += 1;
+                    }
                 },
                 b'(' | b')' => {
                     if bytes[position] == b'(' {
                         operators.push(expression[position..position + 1].to_string());
+                        prev_was_operator = true;
                     } else {
                         while operators.len() > 0 {
                             let top = operators.pop().unwrap();
@@ -73,7 +101,7 @@ pub mod calculator {
                     }
                     position += 1;
                 },
-                _ => panic!("Illegal character found in expression.")
+                _ => ()
             }
         }
 
